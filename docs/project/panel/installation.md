@@ -128,23 +128,11 @@ Generate an application key:
 php artisan key:generate --force
 ```
 
-Edit the `.env` file and update the following settings:
+Next run these commands:
 
-```
-APP_URL=https://your.domain.com
-APP_TIMEZONE=UTC
-
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=panel
-DB_USERNAME=phoenixpanel
-DB_PASSWORD=yourpassword
-
-CACHE_DRIVER=redis
-SESSION_DRIVER=redis
-QUEUE_CONNECTION=redis
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
+```bash
+php artisan p:environment:setup (For panel setup)
+php artisan p:environment:database (For database setup)
 ```
 
 ### Setup Database
@@ -176,19 +164,44 @@ Add the following configuration:
 
 ```nginx
 server {
+    # Replace the example <domain> with your domain name or IP address
     listen 80;
-    server_name your.domain.com;
-    root /var/www/phoenixpanel/public;
+    server_name <domain>;
 
-    index index.php index.html index.htm;
+    root /var/www/phoenixpanel/public;
+    index index.html index.htm index.php;
+    charset utf-8;
 
     location / {
         try_files $uri $uri/ /index.php?$query_string;
     }
 
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    access_log off;
+    error_log  /var/log/nginx/phoenixpanel.app-error.log error;
+
+    # allow larger file uploads and longer script runtimes
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+
+    sendfile off;
+
     location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_intercept_errors off;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 4 16k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
     }
 
     location ~ /\.ht {
